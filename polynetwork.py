@@ -56,7 +56,8 @@ def fetch_transactions(address):
         if int(tx['blockNum'], 16) >= 17660325:
             print(f"[{tx['hash']}] {tx['value']} {tx['asset']} from {tx['from']} to {tx['to']}")
         else:
-            print(f"Omitting {tx['hash']} at block {int(tx['blockNum'], 16)}")
+            print('\r', end='')
+            print(f"Omitting {tx['hash']} at block {int(tx['blockNum'], 16)}", end='')
         fetch_transactions(tx['to'])
 
 
