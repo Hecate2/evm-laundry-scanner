@@ -1,6 +1,7 @@
 from web3 import Web3
 import requests
 import json
+import queue
 
 # Connect to an Ethereum node
 url = 'https://eth-mainnet.g.alchemy.com/v2/_ki9mpf_eLMuhMmHxDTDm62gmS9yRZrD'
@@ -8,6 +9,8 @@ w3 = Web3(Web3.HTTPProvider(url))
 session = requests.Session()
 
 fetched_txs = set()
+fetched_addresses = set()
+addresses_to_fetch = queue.Queue()
 
 def fetch_asset_transfers_from_address(address):
     # Alchemy API request payload
@@ -54,14 +57,19 @@ def fetch_transactions(address):
             continue
         fetched_txs.add(tx['hash'])
         if int(tx['blockNum'], 16) >= 17660325:
+            print('\r', end='')
             print(f"[{tx['hash']}] {tx['value']} {tx['asset']} from {tx['from']} to {tx['to']}")
         else:
             print('\r', end='')
             print(f"Omitting {tx['hash']} at block {int(tx['blockNum'], 16)}", end='')
-        fetch_transactions(tx['to'])
+        if tx['to'] not in fetched_addresses:
+            fetched_addresses.add(tx['to'])
+            addresses_to_fetch.put(tx['to'])
 
 
 # Starting Ethereum address
 starting_address = '0xe0Afadad1d93704761c8550F21A53DE3468Ba599'
 # Fetch transactions recursively
-fetch_transactions(starting_address)
+addresses_to_fetch.put(starting_address)
+while not addresses_to_fetch.empty():
+    fetch_transactions(addresses_to_fetch.get())
