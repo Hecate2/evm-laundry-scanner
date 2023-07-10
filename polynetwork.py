@@ -1,3 +1,4 @@
+from copy import copy
 import json
 import pickle
 import queue
@@ -18,12 +19,13 @@ try:
     with open('fetched_addresses.pkl', 'rb') as f:
         fetched_addresses = pickle.load(f)
 except:
-    fetched_addresses = set()
-addresses_to_fetch = queue.Queue()
+    fetched_addresses = dict()
+addresses_to_fetch = dict()
+starting_address = '0xe0Afadad1d93704761c8550F21A53DE3468Ba599'
+addresses_to_fetch[starting_address] = []
 try:
-    with open('addresses_to_fetch.txt', 'r') as f:
-        for line in f:
-            addresses_to_fetch.put(line.replace('\n', ''))
+    with open('addresses_to_fetch.pkl', 'rb') as f:
+        addresses_to_fetch = pickle.load(f)
 except:
     pass
 output = open('results.txt', 'a')
@@ -64,10 +66,12 @@ def fetch_asset_transfers_from_address(address):
         raise ValueError(f"Error: Request failed with status code {response.status_code}.")
 
 
-def fetch_transactions(address):
+def fetch_transactions(address, route=None):
+    if route is None:
+        route = []
     # Fetch the list of transactions for the given address
     transactions = fetch_asset_transfers_from_address(address)
-    fetched_addresses.add(address)
+    fetched_addresses[address] = route
     if transactions is None:
         return
 
@@ -77,33 +81,32 @@ def fetch_transactions(address):
         fetched_txs.add(tx['hash'])
         if int(tx['blockNum'], 16) >= 17660325:
             print('\r', end='')
-            output_string = f"{tx['hash']} {tx['value']} {tx['asset']} from {tx['from']} to {tx['to']}\n"
+            output_string = f"{tx['hash']} {tx['value']} {tx['asset']} from {tx['from']} to {tx['to']}; route {route}\n"
             print(output_string, end='')
             output.write(output_string)
             output.flush()
         else:
             print('\r', end='')
-            print(f"{addresses_to_fetch.qsize()} addr in queue; Omitting {tx['hash']} at block {int(tx['blockNum'], 16)}", end='')
+            print(f"{len(addresses_to_fetch)} addr in queue; Omitting {tx['hash']} at block {int(tx['blockNum'], 16)}", end='')
         if tx['to'] not in fetched_addresses:
-            addresses_to_fetch.put(tx['to'])
+            copy_route = copy(route)
+            copy_route.append(tx['hash'])
+            addresses_to_fetch[tx['to']] = copy_route
+    return [tx['hash'] for tx in transactions]
 
-
-# Starting Ethereum address
-starting_address = '0xe0Afadad1d93704761c8550F21A53DE3468Ba599'
-# Fetch transactions recursively
-addresses_to_fetch.put(starting_address)
 
 try:
-    while not addresses_to_fetch.empty():
-        current_address = addresses_to_fetch.get()
+    while addresses_to_fetch:
+        current_address = next(iter(addresses_to_fetch))
+        current_route = addresses_to_fetch[current_address]
+        del addresses_to_fetch[current_address]
         if current_address not in fetched_addresses:
-            fetch_transactions(current_address)
+            txs = fetch_transactions(current_address, route=current_route)
 except:
     with open('fetched_txs.pkl', 'wb') as f:
         pickle.dump(fetched_txs, f)
     with open('fetched_addresses.pkl', 'wb') as f:
         pickle.dump(fetched_addresses, f)
-    with open('addresses_to_fetch.txt', 'w') as f:
-        while not addresses_to_fetch.empty():
-            f.write(addresses_to_fetch.get() + '\n')
-        f.write(current_address + '\n')
+    with open('addresses_to_fetch.pkl', 'wb') as f:
+        addresses_to_fetch[current_address] = current_route
+        pickle.dump(addresses_to_fetch, f)
