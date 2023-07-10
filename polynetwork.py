@@ -67,6 +67,7 @@ def fetch_asset_transfers_from_address(address):
 def fetch_transactions(address):
     # Fetch the list of transactions for the given address
     transactions = fetch_asset_transfers_from_address(address)
+    fetched_addresses.add(address)
     if transactions is None:
         return
 
@@ -84,7 +85,6 @@ def fetch_transactions(address):
             print('\r', end='')
             print(f"{addresses_to_fetch.qsize()} addr in queue; Omitting {tx['hash']} at block {int(tx['blockNum'], 16)}", end='')
         if tx['to'] not in fetched_addresses:
-            fetched_addresses.add(tx['to'])
             addresses_to_fetch.put(tx['to'])
 
 
@@ -96,7 +96,8 @@ addresses_to_fetch.put(starting_address)
 try:
     while not addresses_to_fetch.empty():
         current_address = addresses_to_fetch.get()
-        fetch_transactions(current_address)
+        if current_address not in fetched_addresses:
+            fetch_transactions(current_address)
 except:
     with open('fetched_txs.pkl', 'wb') as f:
         pickle.dump(fetched_txs, f)
