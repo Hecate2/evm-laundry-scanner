@@ -83,6 +83,7 @@ def fetch_transactions(address, route=None):
             print('\r', end='')
             output_string = f"{tx['hash']} {tx['value']} {tx['asset']} from {tx['from']} to {tx['to']}; route {route}\n"
             print(output_string, end='')
+            # output.write(f"{tx['hash']},{tx['value']},{tx['asset']},{tx['from']},{tx['to']}\n")
             output.write(output_string)
             output.flush()
         else:
